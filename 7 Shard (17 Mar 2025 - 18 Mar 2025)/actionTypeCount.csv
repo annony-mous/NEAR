@@ -1,0 +1,9 @@
+SELECT
+  action_kind,
+  COUNT(*) AS tx_count
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE block_date >= '2025-03-17'
+  AND block_date <= '2025-03-18'
+GROUP BY action_kind
+ORDER BY tx_count DESC;
+

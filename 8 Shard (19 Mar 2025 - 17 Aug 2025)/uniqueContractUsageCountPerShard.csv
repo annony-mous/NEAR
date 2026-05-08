@@ -1,0 +1,23 @@
+SELECT
+  CASE
+    WHEN receiver_account_id < 'aurora' THEN 0
+    WHEN receiver_account_id >= 'aurora' AND receiver_account_id < 'aurora-0' THEN 1
+    WHEN receiver_account_id >= 'aurora-0' AND receiver_account_id < 'earn.kaiching' THEN 8
+    WHEN receiver_account_id >= 'earn.kaiching' AND receiver_account_id < 'game.hot.tg' THEN 9
+    WHEN receiver_account_id >= 'game.hot.tg' AND receiver_account_id < 'game.hot.tg-0' THEN 6
+    WHEN receiver_account_id >= 'game.hot.tg-0' AND receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+    WHEN receiver_account_id >= 'kkuuue2akv_1630967379.near' AND receiver_account_id < 'tge-lockup.sweat' THEN 4
+    ELSE 5
+  END AS shard_id,
+  COUNT(DISTINCT receiver_account_id) AS contract_count
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE action_kind IN (
+      'FUNCTION_CALL',
+      'USE_GLOBAL_CONTRACT',
+      'USE_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+    )
+  AND receiver_account_id IS NOT NULL
+  AND block_date >= '2025-03-19'
+  AND block_date <= '2025-08-17'
+GROUP BY shard_id
+ORDER BY shard_id;

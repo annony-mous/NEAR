@@ -1,0 +1,77 @@
+-- =========================================================================================
+-- NEAR Transaction Latency (Shard-wise, 2025-03-17 to 2025-03-18)
+-- =========================================================================================
+
+WITH tx_base AS (
+  -- Step 1: Transaction submission time + shard assignment
+  SELECT
+    tx.transaction_hash,
+    TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000)) AS tx_ts,
+    FLOOR((b.block_height - 9820210) / 43200) AS epoch_index,
+
+    CASE
+      WHEN tx.receiver_account_id < 'aurora' THEN 0
+      WHEN tx.receiver_account_id >= 'aurora'
+           AND tx.receiver_account_id < 'aurora-0' THEN 1
+      WHEN tx.receiver_account_id >= 'aurora-0'
+           AND tx.receiver_account_id < 'game.hot.tg' THEN 2
+      WHEN tx.receiver_account_id >= 'game.hot.tg'
+           AND tx.receiver_account_id < 'game.hot.tg-0' THEN 6
+      WHEN tx.receiver_account_id >= 'game.hot.tg-0'
+           AND tx.receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN tx.receiver_account_id >= 'kkuuue2akv_1630967379.near'
+           AND tx.receiver_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS rx_shard
+
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions` AS tx
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.blocks` AS b
+      ON tx.block_hash = b.block_hash
+  WHERE
+    b.block_date >= '2025-03-17'
+    AND b.block_date <= '2025-03-18'
+),
+
+tx_final_execution AS (
+  -- Step 2: Final receipt execution timestamp
+  SELECT
+    r.originated_from_transaction_hash AS transaction_hash,
+    MAX(TIMESTAMP_MICROS(DIV(e.block_timestamp, 1000))) AS final_exec_ts
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes` AS e
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.receipt_origin_transaction` AS r
+      ON e.receipt_id = r.receipt_id
+  WHERE
+    e.block_date >= '2025-03-17'
+    AND e.block_date <= '2025-03-18'
+  GROUP BY
+    r.originated_from_transaction_hash
+)
+
+-- Step 3: Shard-wise latency statistics
+SELECT
+  t.epoch_index,
+  t.rx_shard,
+
+  AVG(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND)) AS avg_latency_sec,
+
+  APPROX_QUANTILES(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND), 100)[OFFSET(50)] AS p50_latency_sec,
+  APPROX_QUANTILES(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND), 100)[OFFSET(80)] AS p80_latency_sec,
+  APPROX_QUANTILES(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND), 100)[OFFSET(90)] AS p90_latency_sec,
+  APPROX_QUANTILES(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND), 100)[OFFSET(95)] AS p95_latency_sec,
+  APPROX_QUANTILES(TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND), 100)[OFFSET(99)] AS p99_latency_sec
+
+FROM
+  tx_base t
+JOIN
+  tx_final_execution e
+    ON t.transaction_hash = e.transaction_hash
+WHERE
+  TIMESTAMP_DIFF(e.final_exec_ts, t.tx_ts, SECOND) >= 0
+GROUP BY
+  t.epoch_index, t.rx_shard
+ORDER BY
+  t.epoch_index, t.rx_shard;

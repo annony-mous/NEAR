@@ -1,0 +1,13 @@
+SELECT DISTINCT
+  t.receiver_account_id AS account_id
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` t
+WHERE t.action_kind = 'FUNCTION_CALL'
+  AND t.receiver_account_id IS NOT NULL
+  AND t.block_date BETWEEN '2025-03-19' AND '2025-08-17'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` p
+    WHERE p.action_kind = 'FUNCTION_CALL'
+      AND p.receiver_account_id = t.receiver_account_id
+      AND p.block_date < '2025-03-19'
+  );

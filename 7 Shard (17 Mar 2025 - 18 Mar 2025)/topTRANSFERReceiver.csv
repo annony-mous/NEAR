@@ -1,0 +1,23 @@
+-- Step 1: Collect all TRANSFER actions (as receiver)
+WITH transfer_receivers AS (
+  SELECT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind = 'TRANSFER'
+    AND receiver_account_id IS NOT NULL
+    AND block_date >= '2025-03-17' AND block_date <= '2025-03-18'
+),
+
+-- Step 2: Count total transfers per receiver
+receiver_activity AS (
+  SELECT
+    account_id,
+    COUNT(*) AS transfer_count
+  FROM transfer_receivers
+  GROUP BY account_id
+)
+
+-- Step 3: Top 100 transfer receivers
+SELECT *
+FROM receiver_activity
+ORDER BY transfer_count DESC
+LIMIT 100;

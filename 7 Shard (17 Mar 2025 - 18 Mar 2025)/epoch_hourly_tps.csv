@@ -1,0 +1,80 @@
+WITH tx_with_epoch_and_shard AS (
+  SELECT
+    FLOOR((b.block_height - 9820210) / 43200) AS epoch_index,
+    TIMESTAMP_MICROS(DIV(b.block_timestamp, 1000)) AS block_ts,
+    TIMESTAMP_TRUNC(
+      TIMESTAMP_MICROS(DIV(b.block_timestamp, 1000)),
+      HOUR
+    ) AS hour_ts,
+    CASE
+      WHEN tx.receiver_account_id < 'aurora' THEN 0
+      WHEN tx.receiver_account_id >= 'aurora'
+           AND tx.receiver_account_id < 'aurora-0' THEN 1
+      WHEN tx.receiver_account_id >= 'aurora-0'
+           AND tx.receiver_account_id < 'game.hot.tg' THEN 2
+      WHEN tx.receiver_account_id >= 'game.hot.tg'
+           AND tx.receiver_account_id < 'game.hot.tg-0' THEN 6
+      WHEN tx.receiver_account_id >= 'game.hot.tg-0'
+           AND tx.receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN tx.receiver_account_id >= 'kkuuue2akv_1630967379.near'
+           AND tx.receiver_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS rx_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions` AS tx
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.blocks` AS b
+    ON tx.block_hash = b.block_hash
+  WHERE
+    b.block_date BETWEEN '2025-03-17' AND '2025-03-18'
+),
+
+-- Hour duration (handles partial hours at boundaries)
+hour_durations AS (
+  SELECT
+    epoch_index,
+    hour_ts,
+    TIMESTAMP_DIFF(MAX(block_ts), MIN(block_ts), SECOND) AS hour_duration_seconds
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index,
+    hour_ts
+),
+
+-- Receiver-side shard tx counts per hour
+shard_hour_counts AS (
+  SELECT
+    epoch_index,
+    hour_ts,
+    rx_shard,
+    COUNT(*) AS transaction_count
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index,
+    hour_ts,
+    rx_shard
+)
+
+-- Per-hour TPS per shard (with epoch label)
+SELECT
+  shc.epoch_index,
+  shc.hour_ts,
+  shc.rx_shard,
+  SAFE_DIVIDE(
+    shc.transaction_count,
+    hd.hour_duration_seconds
+  ) AS avg_tps
+FROM
+  shard_hour_counts AS shc
+JOIN
+  hour_durations AS hd
+  ON shc.epoch_index = hd.epoch_index
+ AND shc.hour_ts = hd.hour_ts
+WHERE
+  hd.hour_duration_seconds > 0
+ORDER BY
+  shc.epoch_index,
+  shc.hour_ts,
+  shc.rx_shard;

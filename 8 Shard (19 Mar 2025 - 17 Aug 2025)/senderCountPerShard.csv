@@ -1,0 +1,21 @@
+SELECT
+  CASE
+    WHEN signer_account_id < 'aurora' THEN 0
+    WHEN signer_account_id >= 'aurora' AND signer_account_id < 'aurora-0' THEN 1
+    WHEN signer_account_id >= 'aurora-0' AND signer_account_id < 'earn.kaiching' THEN 8
+    WHEN signer_account_id >= 'earn.kaiching' AND signer_account_id < 'game.hot.tg' THEN 9
+    WHEN signer_account_id >= 'game.hot.tg' AND signer_account_id < 'game.hot.tg-0' THEN 6
+    WHEN signer_account_id >= 'game.hot.tg-0' AND signer_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+    WHEN signer_account_id >= 'kkuuue2akv_1630967379.near' AND signer_account_id < 'tge-lockup.sweat' THEN 4
+    ELSE 5
+  END AS tx_shard,
+  COUNT(*) AS tx_count
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE
+  block_date >= '2025-03-19'
+  AND block_date <= '2025-08-17'
+GROUP BY
+  tx_shard
+ORDER BY
+  tx_shard;

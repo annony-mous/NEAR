@@ -1,0 +1,36 @@
+-- This query counts ONLY the contract accounts in each shard.
+
+WITH contract_accounts AS (
+  SELECT DISTINCT
+    receiver_account_id AS account_id
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE
+    action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+    )
+    AND block_date >= '2025-03-19' AND block_date <= '2025-08-17'
+    AND receiver_account_id IS NOT NULL
+)
+
+-- Categorize the contract accounts into shards and count them.
+SELECT
+  CASE
+    WHEN account_id < 'aurora' THEN 0
+    WHEN account_id >= 'aurora' AND account_id < 'aurora-0' THEN 1
+    WHEN account_id >= 'aurora-0' AND account_id < 'earn.kaiching' THEN 8
+    WHEN account_id >= 'earn.kaiching' AND account_id < 'game.hot.tg' THEN 9
+    WHEN account_id >= 'game.hot.tg' AND account_id < 'game.hot.tg-0' THEN 6
+    WHEN account_id >= 'game.hot.tg-0' AND account_id < 'kkuuue2akv_1630967379.near' THEN 7
+    WHEN account_id >= 'kkuuue2akv_1630967379.near' AND account_id < 'tge-lockup.sweat' THEN 4
+    ELSE 5
+  END AS shard_id,
+  COUNT(account_id) AS contract_count
+FROM
+  contract_accounts
+GROUP BY
+  shard_id
+ORDER BY
+  shard_id;
