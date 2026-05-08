@@ -1,0 +1,42 @@
+-- Ground-truth shard-to-shard execution flow in NEAR
+
+WITH receipt_execution_shard AS (
+  SELECT
+    receipt_id,
+    shard_id
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes`
+  WHERE
+    block_date > '2024-03-21'
+    AND block_date <= '2025-03-16'
+),
+
+execution_hops AS (
+  SELECT
+    parent.shard_id AS source_shard,
+    child_map.shard_id AS target_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes` parent
+  -- ✅ Correct UNNEST
+  CROSS JOIN
+    UNNEST(parent.outcome_receipt_ids.list) AS receipt_struct
+  JOIN
+    receipt_execution_shard child_map
+    ON child_map.receipt_id = receipt_struct.element
+  WHERE
+    parent.block_date > '2024-03-21'
+    AND parent.block_date <= '2025-03-16'
+)
+
+SELECT
+  source_shard,
+  target_shard,
+  COUNT(*) AS shard_to_shard_execution_count
+FROM
+  execution_hops
+GROUP BY
+  source_shard,
+  target_shard
+ORDER BY
+  source_shard,
+  target_shard;

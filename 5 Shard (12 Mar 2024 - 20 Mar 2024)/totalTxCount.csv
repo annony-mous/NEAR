@@ -1,0 +1,26 @@
+-- Per-shard transaction counts + total at the end
+SELECT
+  CAST(shard_id AS STRING) AS shard_id,
+  COUNT(*) AS tx_count
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE
+  block_date > '2024-03-11' AND block_date <= '2024-03-20'
+GROUP BY
+  shard_id
+
+UNION ALL
+
+-- Total row
+SELECT
+  'TOTAL' AS shard_id,
+  COUNT(*) AS tx_count
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE
+  block_date > '2024-03-11' AND block_date <= '2024-03-20'
+
+ORDER BY
+  -- Keep shards first, total last
+  CASE WHEN shard_id = 'TOTAL' THEN 1 ELSE 0 END,
+  tx_count DESC;
