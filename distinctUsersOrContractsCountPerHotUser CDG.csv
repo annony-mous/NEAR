@@ -1,0 +1,63 @@
+-- Step 0: Hot users (replacing previous hot contracts)
+WITH hot_users AS (
+  SELECT account_id AS hot_user FROM UNNEST([
+    '54dc30df7c9c6a16a4153f1c75dd7f94be7228a626d62ed0fddeee031a083f07',
+    'dcc00befdf5b1aa350c2429da5d8dbee3dcf63b60ca9306cc887579355307974',
+    'tellawraen.near',
+    'paras-vesting.near',
+    'f080dafeed1568dcc2efe097fb1cc3f033a0c6025505da079754972fcbc1f5fd',
+    '5c474c9dc5bb598a71b3063589997c74d68e191cfcfcf2c3ec9646f883839c61',
+    '5d3a28cc7143da232d74eabc87cb0bfb0cc094a1bba461e73482ca8c4770bbce',
+    'caf7949de4fa4a61fd5d4d71c171560e49ad64e35221b01050ddf81a452a61cb',
+    '4e9c6a0a33df221a1c737b7ebb56528b4d637be555bb7c66c7287369e4299b69',
+    'zkrouter.near'
+  ]) AS account_id
+),
+
+-- Step 1: Known contracts (on-chain)
+contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 2: Extract hot-user interactions
+hot_user_interactions AS (
+  SELECT
+    hu.hot_user,
+    CASE
+      WHEN ta.signer_account_id = hu.hot_user THEN ta.receiver_account_id
+      ELSE ta.signer_account_id
+    END AS counterparty
+  FROM hot_users hu
+  JOIN `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+    ON ta.signer_account_id = hu.hot_user
+    OR ta.receiver_account_id = hu.hot_user
+  WHERE ta.action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+    AND ta.block_date <= '2025-12-31'
+)
+
+-- Step 3: Count distinct counterparties
+SELECT
+  hot_user,
+  COUNT(DISTINCT CASE
+      WHEN counterparty IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_contracts_interacted,
+  COUNT(DISTINCT CASE
+      WHEN counterparty NOT IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_users_interacted
+FROM hot_user_interactions
+GROUP BY hot_user
+ORDER BY distinct_users_interacted DESC;

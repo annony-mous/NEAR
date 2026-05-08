@@ -1,0 +1,11 @@
+SELECT
+  shard_id,
+  COUNT(*) AS tx_count
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE
+  block_date <= '2021-11-16'  -- your desired date range
+GROUP BY
+  shard_id
+ORDER BY
+  tx_count DESC;

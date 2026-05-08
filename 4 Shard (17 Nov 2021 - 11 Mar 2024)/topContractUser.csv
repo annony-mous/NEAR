@@ -1,0 +1,37 @@
+-- Step 1: Identify all contract accounts (contracts that received FUNCTION_CALL)
+WITH contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind = 'FUNCTION_CALL'
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2024-03-11'
+),
+
+-- Step 2: Find all users who interacted with those contracts, excluding contracts themselves
+user_contract_interactions AS (
+  SELECT
+    signer_account_id AS user_account,
+    receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE receiver_account_id IN (SELECT contract_id FROM contract_accounts)
+    AND signer_account_id IS NOT NULL
+    AND receiver_account_id IS NOT NULL
+    AND block_date > '2021-11-16'
+    AND block_date <= '2024-03-11'
+    AND signer_account_id NOT IN (SELECT contract_id FROM contract_accounts)  -- exclude contract signers
+),
+
+-- Step 3: Count contract interactions per user
+user_activity AS (
+  SELECT
+    user_account,
+    COUNT(*) AS interaction_count
+  FROM user_contract_interactions
+  GROUP BY user_account
+)
+
+-- Step 4: Return top 100 real users by contract interaction frequency
+SELECT *
+FROM user_activity
+ORDER BY interaction_count DESC
+LIMIT 100;

@@ -1,0 +1,38 @@
+WITH deployed_contracts AS (
+  SELECT DISTINCT
+    receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN ('DEPLOY_CONTRACT', 'DEPLOY_CONTRACT_BY_ACCOUNT_ID')
+)
+
+SELECT
+  CASE
+    WHEN ta.receiver_account_id < 'aurora' THEN 0
+    WHEN ta.receiver_account_id >= 'aurora'
+         AND ta.receiver_account_id < 'aurora-0' THEN 1
+    WHEN ta.receiver_account_id >= 'aurora-0'
+         AND ta.receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 2
+    ELSE 3
+  END AS shard_id,
+
+  -- distinct deployed contracts used
+  COUNT(DISTINCT ta.receiver_account_id) AS distinct_contract_count,
+
+  -- total usage count (interactions)
+  COUNT(*) AS usage_count
+
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+WHERE ta.action_kind IN (
+    'FUNCTION_CALL',
+    'USE_GLOBAL_CONTRACT',
+    'USE_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+  AND ta.receiver_account_id IS NOT NULL
+  AND ta.receiver_account_id IN (
+    SELECT contract_id FROM deployed_contracts
+  )
+  AND ta.block_date > '2021-11-16'
+  AND ta.block_date <= '2024-03-11'
+
+GROUP BY shard_id
+ORDER BY shard_id;

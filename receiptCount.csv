@@ -1,0 +1,21 @@
+-- Query 1: Get counts for each type
+SELECT
+  receipt_kind,
+  COUNT(*) AS total_receipts
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.receipt_details`
+WHERE
+  block_date <= '2025-12-31'
+GROUP BY
+  receipt_kind
+
+UNION ALL
+
+-- Query 2: Get the overall total
+SELECT
+  'Total' AS receipt_kind,
+  COUNT(*) AS total_receipts
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.receipt_details`
+WHERE
+  block_date <= '2025-12-31';

@@ -1,0 +1,23 @@
+-- Step 1: Identify contract accounts
+WITH contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+    'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID',
+    'DEPLOY_GLOBAL_CONTRACT'
+    )
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+)
+
+-- Step 2: Count all actions where signer is a user (not a contract)
+SELECT COUNT(*) AS total_user_tx
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE signer_account_id NOT IN (SELECT account_id FROM contract_accounts)
+  AND signer_account_id IS NOT NULL
+  AND block_date <= '2025-12-31';
+
+
+
+-- User acts as signer (U2U + U2C)

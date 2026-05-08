@@ -1,0 +1,49 @@
+-- Step 1: Collect all signer and receiver accounts
+WITH all_accounts AS (
+  SELECT signer_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE signer_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+
+  UNION ALL
+
+  SELECT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 2: Identify contract accounts
+contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID',
+      'DEPLOY_GLOBAL_CONTRACT'
+      ) 
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 3: Filter only user accounts
+user_accounts AS (
+  SELECT account_id
+  FROM all_accounts
+  WHERE account_id NOT IN (SELECT account_id FROM contract_accounts)
+),
+
+-- Step 4: Count total activity per user
+user_activity AS (
+  SELECT
+    account_id,
+    COUNT(*) AS activity_count
+  FROM user_accounts
+  GROUP BY account_id
+)
+
+-- Step 5: Top 100 users
+SELECT *
+FROM user_activity
+ORDER BY activity_count DESC
+LIMIT 100;

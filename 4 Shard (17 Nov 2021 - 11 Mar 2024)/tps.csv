@@ -1,0 +1,65 @@
+-- TPS per shard based on receiving accounts
+
+WITH tx_with_epoch_and_shard AS (
+  SELECT
+    FLOOR((b.block_height - 9820210) / 43200) AS epoch_index,
+    TIMESTAMP_MICROS(DIV(b.block_timestamp, 1000)) AS block_ts,
+    CASE
+      WHEN tx.receiver_account_id < 'aurora' THEN 0
+      WHEN tx.receiver_account_id < 'aurora-0' THEN 1
+      WHEN tx.receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 2
+      ELSE 3
+    END AS tx_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions` AS tx
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.blocks` AS b
+    ON tx.block_hash = b.block_hash
+  WHERE
+    b.block_date > '2021-11-16'
+    AND b.block_date <= '2024-03-11'
+),
+
+-- Step A: Calculate the TRUE duration of each epoch
+epoch_durations AS (
+  SELECT
+    epoch_index,
+    TIMESTAMP_DIFF(
+      MAX(block_ts),
+      MIN(block_ts),
+      SECOND
+    ) AS epoch_duration_seconds
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index
+),
+
+-- Step B: Count transactions per receiving shard
+shard_counts AS (
+  SELECT
+    epoch_index,
+    tx_shard,
+    COUNT(*) AS transaction_count
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index,
+    tx_shard
+)
+
+-- Step C: Join durations and counts to calculate TPS
+SELECT
+  sc.epoch_index,
+  sc.tx_shard,
+  SAFE_DIVIDE(sc.transaction_count, ed.epoch_duration_seconds) AS avg_tps
+FROM
+  shard_counts AS sc
+JOIN
+  epoch_durations AS ed
+  ON sc.epoch_index = ed.epoch_index
+WHERE
+  ed.epoch_duration_seconds > 0
+ORDER BY
+  sc.epoch_index,
+  sc.tx_shard;

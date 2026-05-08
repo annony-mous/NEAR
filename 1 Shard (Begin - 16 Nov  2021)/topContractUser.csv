@@ -1,0 +1,29 @@
+-- Step 1: Identify all deployed contracts and their deployers
+WITH deployed_contracts AS (
+  SELECT
+    signer_account_id AS user_account,
+    receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind = 'DEPLOY_CONTRACT'
+    AND signer_account_id IS NOT NULL
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2021-11-16'
+),
+
+-- Step 2: Count all usage of these contracts
+contract_usage AS (
+  SELECT
+    dc.user_account,
+    COUNT(*) AS usage_count
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+  JOIN deployed_contracts dc
+    ON ta.receiver_account_id = dc.contract_id
+  WHERE ta.block_date <= '2021-11-16'
+  GROUP BY dc.user_account
+)
+
+-- Step 3: Top users by contract usage
+SELECT *
+FROM contract_usage
+ORDER BY usage_count DESC
+LIMIT 100;

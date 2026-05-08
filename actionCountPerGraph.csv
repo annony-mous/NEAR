@@ -1,0 +1,6 @@
+graph_type,total_actions
+DPG (Delegated Actions Graph),2550452981
+CUG (Contract Usage Graph),2185055828
+AMG (Account Management Graph),384960541
+TFG (Token Flow Graph),382590257
+CDG (Contract Deployment Graph),92694

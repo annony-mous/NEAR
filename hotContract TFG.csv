@@ -1,0 +1,46 @@
+-- Step 1: Known contracts
+WITH contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID',
+      'DEPLOY_GLOBAL_CONTRACT'
+      )
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 2: TRANSFER/STAKE where a contract is either sender or receiver
+contract_related_activity AS (
+  SELECT
+    -- normalize: contract is always contract_id
+    CASE 
+      WHEN ta.receiver_account_id IN (SELECT account_id FROM contract_accounts) 
+        THEN ta.receiver_account_id
+      WHEN ta.signer_account_id IN (SELECT account_id FROM contract_accounts) 
+        THEN ta.signer_account_id
+    END AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+  WHERE block_date <= '2025-12-31'
+    AND action_kind IN ('TRANSFER', 'STAKE')
+    AND (
+          ta.receiver_account_id IN (SELECT account_id FROM contract_accounts)
+       OR ta.signer_account_id   IN (SELECT account_id FROM contract_accounts)
+        )
+),
+
+-- Step 3: Count frequency
+contract_activity AS (
+  SELECT
+    contract_id,
+    COUNT(*) AS usage_count
+  FROM contract_related_activity
+  GROUP BY contract_id
+)
+
+-- Step 4: Top results
+SELECT *
+FROM contract_activity
+ORDER BY usage_count DESC
+LIMIT 100;

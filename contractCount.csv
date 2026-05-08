@@ -1,0 +1,11 @@
+SELECT
+  COUNT(DISTINCT receiver_account_id) AS total_smart_contract_accounts
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE
+  action_kind IN (
+    'DEPLOY_CONTRACT',
+    'DEPLOY_GLOBAL_CONTRACT',
+    'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+  AND block_date <= '2025-12-31';

@@ -1,0 +1,4 @@
+SELECT
+  COUNT(*) AS total_transactions
+FROM `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE block_date <= '2025-12-31';

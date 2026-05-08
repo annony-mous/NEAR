@@ -1,0 +1,58 @@
+-- Step 0: Hot contracts (updated list)
+WITH hot_contracts AS (
+  SELECT contract_id FROM UNNEST([
+    'game.hot.tg',
+    'earn.kaiching',
+    'token.sweat',
+    'wallet.kaiching',
+    'aurora',
+    'app.nearcrowd.near',
+    'inscription.near',
+    'wrap.near',
+    'aa-harvest-moon.near',
+    'v2.ref-finance.near'
+  ]) AS contract_id
+),
+
+-- Step 1: Known contracts (on-chain)
+contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 2: Extract hot-contract interactions
+hot_contract_interactions AS (
+  SELECT
+    hc.contract_id AS hot_contract,
+    CASE
+      WHEN ta.signer_account_id = hc.contract_id THEN ta.receiver_account_id
+      ELSE ta.signer_account_id
+    END AS counterparty
+  FROM hot_contracts hc
+  JOIN `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+    ON ta.signer_account_id = hc.contract_id
+    OR ta.receiver_account_id = hc.contract_id
+    AND ta.block_date <= '2025-12-31'
+)
+
+-- Step 3: Count distinct counterparties
+SELECT
+  hot_contract,
+  COUNT(DISTINCT CASE
+      WHEN counterparty IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_contracts_interacted,
+  COUNT(DISTINCT CASE
+      WHEN counterparty NOT IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_users_interacted
+FROM hot_contract_interactions
+GROUP BY hot_contract
+ORDER BY distinct_users_interacted DESC;

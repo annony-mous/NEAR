@@ -1,0 +1,23 @@
+-- This query counts ONLY the contract accounts in each shard.
+
+WITH contract_accounts AS (
+  SELECT DISTINCT
+    receiver_account_id AS contract_id
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE
+    action_kind = 'DEPLOY_CONTRACT'
+    AND block_date <= '2021-11-16'
+    AND receiver_account_id IS NOT NULL
+)
+
+-- Categorize the contract accounts into shards and count them.
+SELECT
+  0 as shard_id,
+  COUNT(contract_id) AS contract_count
+FROM
+  contract_accounts
+GROUP BY
+  shard_id
+ORDER BY
+  shard_id;

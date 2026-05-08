@@ -1,0 +1,13 @@
+SELECT DISTINCT receiver_account_id AS account_id
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE action_kind = 'FUNCTION_CALL'
+  AND receiver_account_id IS NOT NULL
+  AND block_date > '2021-11-16' 
+  AND block_date <= '2024-03-11'
+  AND receiver_account_id NOT IN (
+    SELECT DISTINCT receiver_account_id
+    FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+    WHERE action_kind = 'FUNCTION_CALL'
+      AND receiver_account_id IS NOT NULL
+      AND block_date <= '2021-11-16'
+  );

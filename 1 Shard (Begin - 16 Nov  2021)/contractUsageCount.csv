@@ -1,0 +1,10 @@
+SELECT
+  COUNT( receiver_account_id) AS contract_count
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE action_kind IN (
+      'FUNCTION_CALL',
+      'USE_GLOBAL_CONTRACT',
+      'USE_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+    )
+  AND receiver_account_id IS NOT NULL
+  AND block_date <= '2021-11-16';

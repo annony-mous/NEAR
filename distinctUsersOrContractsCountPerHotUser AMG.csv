@@ -1,0 +1,64 @@
+-- Step 0: Hot users (relay / system accounts)
+WITH hot_users AS (
+  SELECT account_id AS hot_user FROM UNNEST([
+    'users.kaiching',
+    'sweat-relayer.near',
+    'meteor-relayer.near',
+    'abound.near',
+    'feiyu.near',
+    'thelittles.near',
+    'hooh_official.near',
+    'users.preprod-kaiching.near',
+    'village.hot.tg',
+    'dropt.near'
+  ]) AS account_id
+),
+
+-- Step 1: Known contracts (on-chain)
+contract_accounts AS (
+  SELECT DISTINCT receiver_account_id AS contract_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind IN (
+      'DEPLOY_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT',
+      'DEPLOY_GLOBAL_CONTRACT_BY_ACCOUNT_ID'
+  )
+    AND receiver_account_id IS NOT NULL
+    AND block_date <= '2025-12-31'
+),
+
+-- Step 2: Extract hot-user key/account interactions
+hot_user_interactions AS (
+  SELECT
+    hu.hot_user,
+    CASE
+      WHEN ta.signer_account_id = hu.hot_user THEN ta.receiver_account_id
+      ELSE ta.signer_account_id
+    END AS counterparty
+  FROM hot_users hu
+  JOIN `bigquery-public-data.crypto_near_mainnet_us.transaction_actions` ta
+    ON ta.signer_account_id = hu.hot_user
+    OR ta.receiver_account_id = hu.hot_user
+  WHERE ta.action_kind IN (
+      'ADD_KEY',
+      'CREATE_ACCOUNT',
+      'DELETE_ACCOUNT',
+      'DELETE_KEY'
+  )
+    AND ta.block_date <= '2025-12-31'
+)
+
+-- Step 3: Count distinct counterparties
+SELECT
+  hot_user,
+  COUNT(DISTINCT CASE
+      WHEN counterparty IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_contracts_interacted,
+  COUNT(DISTINCT CASE
+      WHEN counterparty NOT IN (SELECT contract_id FROM contract_accounts)
+      THEN counterparty
+  END) AS distinct_users_interacted
+FROM hot_user_interactions
+GROUP BY hot_user
+ORDER BY distinct_users_interacted DESC;

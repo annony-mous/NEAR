@@ -1,0 +1,5 @@
+SELECT
+  COUNT(DISTINCT affected_account_id) AS total_unique_accounts_with_activity
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.account_changes`
+WHERE block_date <= '2025-12-31';

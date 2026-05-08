@@ -1,0 +1,53 @@
+WITH tx_with_epoch AS (
+  SELECT
+    FLOOR((b.block_height - 9820210) / 43200) AS epoch_index,
+    b.block_height,
+    TIMESTAMP_MICROS(DIV(b.block_timestamp, 1000)) AS block_ts,
+    CASE
+      WHEN tx.signer_account_id < 'aurora' THEN 0
+      WHEN tx.signer_account_id < 'aurora-0' THEN 1
+      WHEN tx.signer_account_id < 'kkuuue2akv_1630967379.near' THEN 2
+      ELSE 3
+    END AS tx_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions` AS tx
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.blocks` AS b
+    ON tx.block_hash = b.block_hash
+  WHERE
+    b.block_date > '2021-11-16'
+    AND b.block_date <= '2024-03-11'
+),
+
+epoch_stats AS (
+  SELECT
+    epoch_index,
+    tx_shard,
+    MIN(block_height) AS epoch_start_block,
+    MAX(block_height) AS epoch_end_block,
+    TIMESTAMP_DIFF(
+      MAX(block_ts),
+      MIN(block_ts),
+      SECOND
+    ) AS epoch_duration_seconds,
+    COUNT(*) AS transaction_count
+  FROM
+    tx_with_epoch
+  GROUP BY
+    epoch_index,
+    tx_shard
+)
+
+SELECT
+  epoch_index,
+  tx_shard,
+  epoch_start_block,
+  epoch_end_block,
+  SAFE_DIVIDE(transaction_count, epoch_duration_seconds) AS avg_tps
+FROM
+  epoch_stats
+WHERE
+  epoch_duration_seconds > 0
+ORDER BY
+  epoch_index,
+  tx_shard;
