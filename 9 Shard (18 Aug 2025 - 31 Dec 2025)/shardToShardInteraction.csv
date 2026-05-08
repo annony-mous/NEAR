@@ -1,0 +1,45 @@
+WITH receipt_shards AS (
+  SELECT
+    -- Source shard: predecessor (direct caller)
+    CASE
+      WHEN predecessor_account_id < '650' THEN 10
+      WHEN predecessor_account_id < 'aurora' THEN 11
+      WHEN predecessor_account_id < 'aurora-0' THEN 1
+      WHEN predecessor_account_id < 'earn.kaiching' THEN 8
+      WHEN predecessor_account_id < 'game.hot.tg' THEN 9
+      WHEN predecessor_account_id < 'game.hot.tg-0' THEN 6
+      WHEN predecessor_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN predecessor_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS source_shard,
+
+    -- Target shard: receiver (executing account)
+    CASE
+      WHEN receiver_account_id < '650' THEN 10
+      WHEN receiver_account_id < 'aurora' THEN 11
+      WHEN receiver_account_id < 'aurora-0' THEN 1
+      WHEN receiver_account_id < 'earn.kaiching' THEN 8
+      WHEN receiver_account_id < 'game.hot.tg' THEN 9
+      WHEN receiver_account_id < 'game.hot.tg-0' THEN 6
+      WHEN receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN receiver_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS target_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.receipt_details`
+  WHERE
+    block_date BETWEEN '2025-08-18' AND '2025-12-09'
+)
+
+SELECT
+  source_shard,
+  target_shard,
+  COUNT(*) AS interaction_count
+FROM
+  receipt_shards
+GROUP BY
+  source_shard,
+  target_shard
+ORDER BY
+  source_shard,
+  target_shard;

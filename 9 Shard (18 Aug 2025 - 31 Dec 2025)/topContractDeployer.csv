@@ -1,0 +1,23 @@
+-- Step 1: Collect all DEPLOY_CONTRACT actions
+WITH deploy_actions AS (
+  SELECT signer_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE action_kind = 'DEPLOY_CONTRACT'
+    AND signer_account_id IS NOT NULL
+    AND block_date BETWEEN '2025-08-18' AND '2025-12-09'
+),
+
+-- Step 2: Count total deployments per signer
+deployment_count AS (
+  SELECT
+    account_id,
+    COUNT(*) AS deploy_count
+  FROM deploy_actions
+  GROUP BY account_id
+)
+
+-- Step 3: Top 100 accounts by contract deployments
+SELECT *
+FROM deployment_count
+ORDER BY deploy_count DESC
+LIMIT 100;

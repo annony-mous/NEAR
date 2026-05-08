@@ -1,0 +1,58 @@
+-- Step 1: Identify all unique accounts that are contracts by finding receivers of DEPLOY_CONTRACT actions.
+WITH contract_accounts AS (
+  SELECT DISTINCT
+    receiver_account_id AS contract_id
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE
+    action_kind = 'DEPLOY_CONTRACT'
+    AND receiver_account_id IS NOT NULL
+),
+
+-- Step 2: Get a list of all unique accounts active in the specified period.
+all_active_accounts AS (
+  SELECT signer_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE block_date >= '2025-08-18' and block_date <= '2025-12-09'
+    AND signer_account_id IS NOT NULL
+  UNION DISTINCT
+  SELECT receiver_account_id AS account_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE block_date >= '2025-08-18' and block_date <= '2025-12-09'
+    AND receiver_account_id IS NOT NULL
+),
+
+-- Step 3: Filter out contract accounts to get a list of "user only" accounts.
+user_accounts AS (
+  SELECT
+    t1.account_id
+  FROM
+    all_active_accounts AS t1
+  LEFT JOIN
+    contract_accounts AS t2
+  ON
+    t1.account_id = t2.contract_id
+  WHERE
+    t2.contract_id IS NULL
+)
+
+-- Step 4: Categorize user accounts into shards and count them.
+SELECT
+  CASE
+    WHEN account_id < '650' THEN 10
+    WHEN account_id >= '650' AND account_id < 'aurora' THEN 11
+    WHEN account_id >= 'aurora' AND account_id < 'aurora-0' THEN 1
+    WHEN account_id >= 'aurora-0' AND account_id < 'earn.kaiching' THEN 8
+    WHEN account_id >= 'earn.kaiching' AND account_id < 'game.hot.tg' THEN 9
+    WHEN account_id >= 'game.hot.tg' AND account_id < 'game.hot.tg-0' THEN 6
+    WHEN account_id >= 'game.hot.tg-0' AND account_id < 'kkuuue2akv_1630967379.near' THEN 7
+    WHEN account_id >= 'kkuuue2akv_1630967379.near' AND account_id < 'tge-lockup.sweat' THEN 4
+    ELSE 5
+  END AS shard_id,
+  COUNT(account_id) AS user_count
+FROM
+  user_accounts
+GROUP BY
+  shard_id
+ORDER BY
+  shard_id;

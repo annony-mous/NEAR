@@ -1,0 +1,21 @@
+SELECT
+  CASE
+    WHEN receiver_account_id < '650' THEN 10
+    WHEN receiver_account_id < 'aurora' THEN 11
+    WHEN receiver_account_id < 'aurora-0' THEN 1
+    WHEN receiver_account_id < 'earn.kaiching' THEN 8
+    WHEN receiver_account_id < 'game.hot.tg' THEN 9
+    WHEN receiver_account_id < 'game.hot.tg-0' THEN 6
+    WHEN receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+    WHEN receiver_account_id < 'tge-lockup.sweat' THEN 4
+    ELSE 5
+  END AS rx_shard,
+  COUNT(*) AS tx_count
+FROM
+  `bigquery-public-data.crypto_near_mainnet_us.transactions`
+WHERE
+  block_date BETWEEN '2025-08-18' AND '2025-12-09'
+GROUP BY
+  rx_shard
+ORDER BY
+  rx_shard;

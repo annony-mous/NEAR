@@ -1,0 +1,39 @@
+WITH target_actions AS (
+  -- Step 1: Collect actions targeting the new contract set
+  SELECT 
+    receiver_account_id AS contract_id,
+    converted_into_receipt_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE receiver_account_id IN (
+    'game.hot.tg',
+    'wallet.kaiching',
+    'token.sweat',
+    'wrap.near',
+    'v2.ref-finance.near',
+    'coin.abound.near',
+    'aa-harvest-moon.near',
+    'aurora',
+    'firedrop.hot.tg',
+    '17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1'
+  )
+  AND block_date BETWEEN '2025-03-12' AND '2025-03-18'
+)
+
+-- Step 2: Join to execution outcomes to compute gas metrics
+SELECT
+  ta.contract_id,
+
+  COUNT(eo.receipt_id) AS executed_receipt_count,
+
+  -- Total gas burnt (TGas)
+  SUM(eo.gas_burnt) / 1e12 AS total_tgas_burnt,
+
+  -- Average gas per action (TGas)
+  SAFE_DIVIDE(SUM(eo.gas_burnt), COUNT(eo.receipt_id)) / 1e12 AS avg_tgas_per_action
+
+FROM target_actions ta
+JOIN `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes` eo
+  ON ta.converted_into_receipt_id = eo.receipt_id
+
+GROUP BY ta.contract_id
+ORDER BY executed_receipt_count DESC;

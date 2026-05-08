@@ -1,0 +1,87 @@
+WITH daily_metrics AS (
+  SELECT
+    DATE(block_timestamp_utc) AS day,
+    SUM(gas_burnt) AS daily_gas_burnt,
+    COUNT(receipt_id) AS daily_tx_count
+  FROM `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes`
+  WHERE DATE(block_timestamp_utc) BETWEEN '2024-01-01' AND '2025-12-31'
+  GROUP BY 1
+),
+
+rolling_7day_stats AS (
+  SELECT
+    day AS window_end_date,
+    DATE_SUB(day, INTERVAL 6 DAY) AS window_start_date,
+
+    SUM(daily_gas_burnt) OVER (
+      ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS total_gas_7d,
+
+    SUM(daily_tx_count) OVER (
+      ORDER BY day ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS total_tx_7d
+
+  FROM daily_metrics
+),
+
+dataset_stats AS (
+  -- Calculate the 50th percentile (median) to find the "Typical" midpoint
+  SELECT
+    APPROX_QUANTILES(total_gas_7d, 100)[OFFSET(50)] AS p50_gas  -- Median for Typical load
+  FROM rolling_7day_stats
+)
+
+-- =======================
+-- 1. HIGH LOAD (Max Peak)
+-- =======================
+SELECT * FROM (
+  SELECT 
+    '1. High (Stress)' AS region_label,
+    window_start_date,
+    window_end_date,
+    total_gas_7d / 1e12 AS total_tgas_burnt,
+    total_tx_7d AS total_execution_count,
+    SAFE_DIVIDE(total_gas_7d, total_tx_7d) / 1e12 AS avg_tgas_per_tx
+  FROM rolling_7day_stats
+  ORDER BY total_gas_7d DESC
+  LIMIT 1
+)
+
+UNION ALL
+
+-- =======================
+-- 2. MEDIUM LOAD (Median / Typical)
+-- =======================
+SELECT * FROM (
+  SELECT 
+    '2. Medium (Typical)' AS region_label,
+    window_start_date,
+    window_end_date,
+    total_gas_7d / 1e12,
+    total_tx_7d,
+    SAFE_DIVIDE(total_gas_7d, total_tx_7d) / 1e12
+  FROM rolling_7day_stats, dataset_stats
+  -- Find the week mathematically closest to the 50th percentile (median) mark
+  ORDER BY ABS(total_gas_7d - dataset_stats.p50_gas) ASC
+  LIMIT 1
+)
+
+UNION ALL
+
+-- =======================
+-- 3. LOW LOAD (Baseline)
+-- =======================
+SELECT * FROM (
+  SELECT 
+    '3. Low (Baseline)' AS region_label,
+    window_start_date,
+    window_end_date,
+    total_gas_7d / 1e12,
+    total_tx_7d,
+    SAFE_DIVIDE(total_gas_7d, total_tx_7d) / 1e12
+  FROM rolling_7day_stats
+  WHERE total_gas_7d > 0
+  ORDER BY total_gas_7d ASC
+  LIMIT 1
+)
+ORDER BY total_tgas_burnt DESC;

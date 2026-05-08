@@ -1,0 +1,45 @@
+WITH tx_with_latency AS (
+  SELECT
+    TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000)) AS tx_ts,
+    MAX(TIMESTAMP_MICROS(DIV(e.block_timestamp, 1000))) AS final_exec_ts,
+    TIMESTAMP_DIFF(
+      MAX(TIMESTAMP_MICROS(DIV(e.block_timestamp, 1000))),
+      TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000)),
+      SECOND
+    ) AS latency_sec
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transactions` tx
+  JOIN `bigquery-public-data.crypto_near_mainnet_us.receipt_origin_transaction` r
+    ON tx.transaction_hash = r.originated_from_transaction_hash
+  JOIN `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes` e
+    ON e.receipt_id = r.receipt_id
+  WHERE DATE(TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000))) BETWEEN '2023-12-26' AND '2024-01-01'
+     OR DATE(TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000))) BETWEEN '2025-03-12' AND '2025-03-18'
+     OR DATE(TIMESTAMP_MICROS(DIV(tx.block_timestamp, 1000))) BETWEEN '2024-03-31' AND '2024-04-06'
+  GROUP BY tx.transaction_hash, tx.block_timestamp
+)
+
+SELECT 'Low' AS region_label,
+       AVG(latency_sec) AS avg_latency_sec
+FROM tx_with_latency
+WHERE DATE(tx_ts) BETWEEN '2023-12-26' AND '2024-01-01'
+
+UNION ALL
+
+SELECT 'Moderate',
+       AVG(latency_sec)
+FROM tx_with_latency
+WHERE DATE(tx_ts) BETWEEN '2025-03-12' AND '2025-03-18'
+
+UNION ALL
+
+SELECT 'Heavy',
+       AVG(latency_sec)
+FROM tx_with_latency
+WHERE DATE(tx_ts) BETWEEN '2024-03-31' AND '2024-04-06'
+
+ORDER BY
+  CASE region_label
+    WHEN 'Low' THEN 1
+    WHEN 'Moderate' THEN 2
+    WHEN 'Heavy' THEN 3
+  END;

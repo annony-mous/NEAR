@@ -1,0 +1,35 @@
+WITH receipt_shards AS (
+  SELECT
+    -- Source shard: predecessor (direct caller)
+    CASE
+      WHEN predecessor_account_id < 'aurora' THEN 0
+      WHEN predecessor_account_id >= 'aurora' AND predecessor_account_id < 'aurora-0' THEN 1
+      WHEN predecessor_account_id >= 'aurora-0' AND predecessor_account_id < 'kkuuue2akv_1630967379.near' THEN 2
+      ELSE 3
+    END AS source_shard,
+
+    -- Target shard: receiver (executing account)
+    CASE
+      WHEN receiver_account_id < 'aurora' THEN 0
+      WHEN receiver_account_id >= 'aurora' AND receiver_account_id < 'aurora-0' THEN 1
+      WHEN receiver_account_id >= 'aurora-0' AND receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 2
+      ELSE 3
+    END AS target_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.receipt_details`
+  WHERE
+    block_date >= '2023-12-26' and block_date <= '2024-01-01' 
+)
+
+SELECT
+  source_shard,
+  target_shard,
+  COUNT(*) AS interaction_count
+FROM
+  receipt_shards
+GROUP BY
+  source_shard,
+  target_shard
+ORDER BY
+  source_shard,
+  target_shard;

@@ -1,0 +1,65 @@
+WITH tx_with_epoch_and_shard AS (
+  SELECT
+    FLOOR((b.block_height - 9820210) / 43200) AS epoch_index,
+    TIMESTAMP_MICROS(DIV(b.block_timestamp, 1000)) AS block_ts,
+    CASE
+      WHEN tx.signer_account_id < '650' THEN 10
+      WHEN tx.signer_account_id < 'aurora' THEN 11
+      WHEN tx.signer_account_id < 'aurora-0' THEN 1
+      WHEN tx.signer_account_id < 'earn.kaiching' THEN 8
+      WHEN tx.signer_account_id < 'game.hot.tg' THEN 9
+      WHEN tx.signer_account_id < 'game.hot.tg-0' THEN 6
+      WHEN tx.signer_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN tx.signer_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS tx_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions` AS tx
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.blocks` AS b
+    ON tx.block_hash = b.block_hash
+  WHERE
+    b.block_date >= '2025-08-18'
+    AND b.block_date <= '2025-12-09'
+),
+
+epoch_durations AS (
+  SELECT
+    epoch_index,
+    TIMESTAMP_DIFF(
+      MAX(block_ts),
+      MIN(block_ts),
+      SECOND
+    ) AS epoch_duration_seconds
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index
+),
+
+shard_counts AS (
+  SELECT
+    epoch_index,
+    tx_shard,
+    COUNT(*) AS transaction_count
+  FROM
+    tx_with_epoch_and_shard
+  GROUP BY
+    epoch_index,
+    tx_shard
+)
+
+SELECT
+  sc.epoch_index,
+  sc.tx_shard,
+  SAFE_DIVIDE(sc.transaction_count, ed.epoch_duration_seconds) AS avg_tps
+FROM
+  shard_counts AS sc
+JOIN
+  epoch_durations AS ed
+  ON sc.epoch_index = ed.epoch_index
+WHERE
+  ed.epoch_duration_seconds > 0
+ORDER BY
+  sc.epoch_index,
+  sc.tx_shard;

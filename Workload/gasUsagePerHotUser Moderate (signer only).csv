@@ -1,0 +1,38 @@
+WITH target_actions AS (
+  -- Step 1: Actions initiated by updated hot users
+  SELECT
+    signer_account_id AS hot_user,
+    converted_into_receipt_id
+  FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+  WHERE signer_account_id IN (
+    'hotwallet.kaiching',
+    'relay.tg',
+    '0-relay.hot.tg',
+    'users.kaiching',
+    'sweat-relayer.near',
+    'spin.sweat',
+    'oracle.sweat',
+    'abound.near',
+    'learn.sweat',
+    'relay.aurora'
+  )
+  AND block_date BETWEEN '2025-03-12' AND '2025-03-18'
+)
+
+SELECT
+  hot_user,
+
+  COUNT(eo.receipt_id) AS executed_receipt_count,
+
+  -- Total gas burnt (TGas)
+  SUM(eo.gas_burnt) / 1e12 AS total_tgas_burnt,
+
+  -- Average gas per executed action (TGas)
+  SAFE_DIVIDE(SUM(eo.gas_burnt), COUNT(eo.receipt_id)) / 1e12 AS avg_tgas_per_action
+
+FROM target_actions ta
+JOIN `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes` eo
+  ON ta.converted_into_receipt_id = eo.receipt_id
+
+GROUP BY hot_user
+ORDER BY total_tgas_burnt DESC;

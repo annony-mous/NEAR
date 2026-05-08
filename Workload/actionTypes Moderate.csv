@@ -1,0 +1,7 @@
+SELECT
+    action_kind,
+    COUNT(*) AS total_actions
+FROM `bigquery-public-data.crypto_near_mainnet_us.transaction_actions`
+WHERE DATE(block_timestamp_utc) BETWEEN '2025-03-12' AND '2025-03-18'
+GROUP BY action_kind
+ORDER BY total_actions DESC;

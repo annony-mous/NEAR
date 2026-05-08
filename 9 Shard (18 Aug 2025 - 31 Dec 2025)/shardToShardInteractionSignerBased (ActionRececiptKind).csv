@@ -1,0 +1,63 @@
+WITH tx AS (
+  SELECT
+    transaction_hash,
+    signer_account_id,
+    CASE
+      WHEN signer_account_id < '650' THEN 10
+      WHEN signer_account_id < 'aurora' THEN 11
+      WHEN signer_account_id < 'aurora-0' THEN 1
+      WHEN signer_account_id < 'earn.kaiching' THEN 8
+      WHEN signer_account_id < 'game.hot.tg' THEN 9
+      WHEN signer_account_id < 'game.hot.tg-0' THEN 6
+      WHEN signer_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN signer_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS tx_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.transactions`
+  WHERE block_date BETWEEN '2025-08-18' AND '2025-12-09'
+),
+
+rc AS (
+  SELECT
+    r.originated_from_transaction_hash AS transaction_hash,
+    rec.receiver_account_id,
+    CASE
+      WHEN rec.receiver_account_id < '650' THEN 10
+      WHEN rec.receiver_account_id < 'aurora' THEN 11
+      WHEN rec.receiver_account_id < 'aurora-0' THEN 1
+      WHEN rec.receiver_account_id < 'earn.kaiching' THEN 8
+      WHEN rec.receiver_account_id < 'game.hot.tg' THEN 9
+      WHEN rec.receiver_account_id < 'game.hot.tg-0' THEN 6
+      WHEN rec.receiver_account_id < 'kkuuue2akv_1630967379.near' THEN 7
+      WHEN rec.receiver_account_id < 'tge-lockup.sweat' THEN 4
+      ELSE 5
+    END AS receipt_shard
+  FROM
+    `bigquery-public-data.crypto_near_mainnet_us.receipt_origin_transaction` r
+  JOIN
+    `bigquery-public-data.crypto_near_mainnet_us.receipt_details` rec
+  ON
+    r.receipt_id = rec.receipt_id
+  WHERE
+    r.block_date BETWEEN '2025-08-18' AND '2025-12-09'
+    AND rec.block_date BETWEEN '2025-08-18' AND '2025-12-09'
+    AND r.receipt_kind = 'ACTION'
+)
+
+SELECT
+  tx.tx_shard AS source_shard,
+  rc.receipt_shard AS target_shard,
+  COUNT(*) AS interaction_count
+FROM
+  tx
+JOIN
+  rc
+ON
+  tx.transaction_hash = rc.transaction_hash
+GROUP BY
+  source_shard,
+  target_shard
+ORDER BY
+  source_shard,
+  target_shard;

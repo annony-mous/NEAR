@@ -1,0 +1,34 @@
+SELECT
+  'Low' AS load_level,
+  COUNT(*) AS total_receipts,
+  SUM(gas_burnt)/1e12 AS total_tgas_burnt,
+  AVG(gas_burnt)/1e12 AS avg_tgas_per_receipt
+FROM `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes`
+WHERE block_date BETWEEN '2023-12-26' AND '2024-01-01'
+
+UNION ALL
+
+SELECT
+  'Moderate',
+  COUNT(*),
+  SUM(gas_burnt)/1e12,
+  AVG(gas_burnt)/1e12
+FROM `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes`
+WHERE block_date BETWEEN '2025-03-12' AND '2025-03-18'
+
+UNION ALL
+
+SELECT
+  'Heavy',
+  COUNT(*),
+  SUM(gas_burnt)/1e12,
+  AVG(gas_burnt)/1e12
+FROM `bigquery-public-data.crypto_near_mainnet_us.execution_outcomes`
+WHERE block_date BETWEEN '2024-03-31' AND '2024-04-06'
+
+ORDER BY
+  CASE load_level
+    WHEN 'Low' THEN 1
+    WHEN 'Moderate' THEN 2
+    WHEN 'Heavy' THEN 3
+  END;
